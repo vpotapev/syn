@@ -32,6 +32,7 @@
 -export([unregister/1]).
 -export([find_by_key/1, find_by_key/2]).
 -export([find_by_pid/1, find_by_pid/2]).
+-export([find_by_pattern/1, find_by_pattern/2]).
 -export([count/0, count/1]).
 
 %% gen_server callbacks
@@ -82,6 +83,16 @@ find_by_pid(Pid, with_meta) when is_pid(Pid) ->
         undefined -> undefined;
         Process -> {Process#syn_registry_table.key, Process#syn_registry_table.meta}
     end.
+
+-spec find_by_pattern(PatternKey :: any()) -> list(pid()) | [].
+find_by_pattern(PatternKey) ->
+    Processes = i_find_by_pattern(on_connected_node, PatternKey),
+    lists:map(fun(Process) -> Process#syn_registry_table.pid end, Processes).
+
+-spec find_by_pattern(PatternKey :: any(), with_meta) -> list({pid(), Meta :: any()}) | [].
+find_by_pattern(PatternKey, with_meta) ->
+    Processes = i_find_by_pattern(on_connected_node, PatternKey),
+    lists:map(fun(Process) -> {Process#syn_registry_table.pid, Process#syn_registry_table.meta} end, Processes).
 
 -spec register(Key :: any(), Pid :: pid()) -> ok | {error, taken | pid_already_registered}.
 register(Key, Pid) when is_pid(Pid) ->
@@ -329,7 +340,28 @@ i_find_by_pid(Pid) ->
         _ -> undefined
     end.
 
--spec return_if_on_connected_node(Process :: #syn_registry_table{}) -> Process :: #syn_registry_table{} | undefined.
+-spec i_find_by_pattern(on_connected_node, PatternKey :: any()) -> Processes :: list(#syn_registry_table{}) | [].
+i_find_by_pattern(on_connected_node, PatternKey) ->
+    case i_find_by_pattern(PatternKey) of
+        [] -> [];
+        Processes when is_list(Processes) -> return_if_on_connected_node(Processes)
+    end.
+
+-spec i_find_by_pattern(PatternKey :: any()) -> Processes :: list(#syn_registry_table{}) | [].
+i_find_by_pattern(PatternKey) ->
+    case mnesia:match_object(syn_registry_table, PatternKey, 'read') of
+        [_H | _T] = Processes -> Processes;
+        _ -> []
+    end.
+
+-spec return_if_on_connected_node
+    (Process :: #syn_registry_table{}) -> Process :: #syn_registry_table{} | undefined;
+    (Processes :: list(#syn_registry_table{})) -> Process :: list(#syn_registry_table{}) | [].
+return_if_on_connected_node(Processes) when is_list(Processes) ->
+    lists:filter(
+        fun(Process) ->
+            lists:member(Process#syn_registry_table.node, [node() | nodes()])
+        end, Processes);
 return_if_on_connected_node(Process) ->
     case lists:member(Process#syn_registry_table.node, [node() | nodes()]) of
         true -> Process;

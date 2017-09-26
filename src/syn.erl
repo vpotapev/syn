@@ -34,6 +34,7 @@
 -export([unregister/1]).
 -export([find_by_key/1, find_by_key/2]).
 -export([find_by_pid/1, find_by_pid/2]).
+-export([find_by_pattern/1, find_by_pattern/2]).
 -export([registry_count/0, registry_count/1]).
 
 %% registry for gen_server name via-tuples
@@ -97,6 +98,14 @@ find_by_pid(Pid) ->
 -spec find_by_pid(Pid :: pid(), with_meta) -> {Key :: any(), Meta :: any()} | undefined.
 find_by_pid(Pid, with_meta) ->
     syn_registry:find_by_pid(Pid, with_meta).
+
+-spec find_by_pattern(PatternKey :: any()) -> list(pid()) | [].
+find_by_pattern(PatternKey) ->
+    syn_registry:find_by_pattern(PatternKey).
+
+-spec find_by_pattern(PatternKey :: any(), with_meta) -> list({pid(), Meta :: any()}) | [].
+find_by_pattern(PatternKey, with_meta) ->
+    syn_registry:find_by_pattern(PatternKey, with_meta).
 
 -spec registry_count() -> non_neg_integer().
 registry_count() ->
